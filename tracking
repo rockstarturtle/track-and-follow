@@ -14,7 +14,11 @@ PX4 SITL simulation and Python asynchronous programming with the ‘asyncio’ l
 to my previous "Circuit Cellar" article "Quadrotor Autonomous Flight with PX4 and MAVSDK"
 (Circuit Cellar [number], [month] 2019)
 '''
-import yolov5.detect
+
+from yolov5 import test
+import cv2
+import torch
+
 import asyncio
 import cv2
 from mavsdk import System
@@ -43,9 +47,10 @@ async def run():
     
     # Open the video camera
     vid_cam = cv2.VideoCapture(0)
+    print('vidcam')
 
     # Let the camera warm up
-    # await asyncio.sleep(2)
+    await asyncio.sleep(2)
 
     # Check if the camera opened correctly
     if vid_cam.isOpened() is False: 
@@ -111,8 +116,9 @@ async def run():
     # Infinite detect-follow loop
     while True:
         # Get the target coordinates (if any target was detected)
+        #ret, frame = vid_cam.read()
         tgt_cam_coord, frame = await get_target_coordinates(vid_cam)
-        
+        #print('120')
         # If a target was found, filter their coordinates
         if tgt_cam_coord['width'] is not None and tgt_cam_coord['height'] is not None:
             # Apply Moving Average filter to target camera coordinates
@@ -150,14 +156,17 @@ async def run():
         frame = await draw_objects(tgt_cam_coord, tgt_filt_cam_coord, frame)
 
         # Show the detection image frame on screen
+        #print('imshow')
         cv2.imshow("Detect and Track", frame)
 
         # Catch aborting key from computer keyboard
-        key = cv2.waitKey(0) & 0xFF
+        key = cv2.waitKey(1) & 0xFF
         # If the 'q' key is pressed, break the 'while' infinite loop
         if key == ord("q"):
             break
-
+    vid_cam.release()
+    cv2.destroyAllWindows()
+   
     # After leaving the infinite loop, return the drone to home before ending the script
     print("-- Return to launch...")
     # await drone.action.return_to_launch()
@@ -222,14 +231,17 @@ async def get_target_coordinates(vid_cam):
     is_grabbed, frame = vid_cam.read()
 
     # Resize the image frame for the detection process, if needed
-    if params['scaling_factor'] != 1:
-        dimension = (params['resized_width'], params['resized_height'])
-        frame = cv2.resize(frame, dimension, interpolation = cv2.INTER_AREA)
+   
     
-    cX, cY= yolov5.detect(frame)
-    print("info")
-    # Return centroid coordinates (camera pixel units), the analized frame and the largest contour
-    return {'width':cX, 'height':cY}, frame
+    centerxy= test.det(frame)
+    if len(centerxy) > 0: #en az 1 nesne detect edildiğinde
+        cX, cY = centerxy[0]
+        #print("info")
+        # Return centroid coordinates (camera pixel units), the analized frame and the largest contour
+        return {'width':cX, 'height':cY}, frame
+    else:
+        print('anlamlı')
+        return {'width':None, 'height':None}, frame
 
 
 async def moving_average_filter(coord):
@@ -259,7 +271,7 @@ async def moving_average_filter(coord):
     return {'width':w_filt, 'height':h_filt}
 
 
-async def draw_objects(cam_coord, filt_cam_coord, frame, contour):
+async def draw_objects(cam_coord, filt_cam_coord, frame):
     """ Draws visualization objects from the detection process.
     Position coordinates of every object are always in 'camera pixel' units"""
 
@@ -272,11 +284,13 @@ async def draw_objects(cam_coord, filt_cam_coord, frame, contour):
     cv2.rectangle(frame, params['cent_rect_p1'], params['cent_rect_p2'], (0, 178, 255), 1)
 
     # Draw the detected object's contour, if any
-    cv2.drawContours(frame, [contour], -1, (0, 255, 0), 2)
-
+   
     # Compute Cartesian coordinates of unfiltered detected object's centroid
-    x_cart_coord = cam_coord['width'] - params['y_ax_pos']
-    y_cart_coord = params['x_ax_pos'] - cam_coord['height']
+    #x_cart_coord = cam_coord['width'] - params['y_ax_pos']
+    x_cart_coord = cam_coord['width'] 
+
+    #y_cart_coord = params['x_ax_pos'] - cam_coord['height']
+    y_cart_coord = cam_coord['height']
 
     # Compute Cartesian coordinates of filtered detected object's centroid
     x_filt_cart_coord = filt_cam_coord['width'] - params['y_ax_pos']
@@ -292,6 +306,7 @@ async def draw_objects(cam_coord, filt_cam_coord, frame, contour):
     cv2.putText(frame, str(x_filt_cart_coord) + ", " + str(y_filt_cart_coord), 
         (filt_cam_coord['width'] + 25, filt_cam_coord['height'] - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 30, 30), 1)
 
+
     return frame # Return the image frame with all drawn objects
 
 
@@ -299,3 +314,4 @@ if __name__ == "__main__":
    
     loop = asyncio.get_event_loop()
     loop.run_until_complete(run())
+    
