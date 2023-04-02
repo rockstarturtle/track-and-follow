@@ -8,7 +8,7 @@ Object_classes = ["people", "pedestrian", "human"]
 Object_detector = OBJ_DETECTION("weights/son.pt", Object_classes)
 
 
-def det(frame):
+def detect(frame):
     # detection process
     objs = Object_detector.detect(frame)
     xy = []
