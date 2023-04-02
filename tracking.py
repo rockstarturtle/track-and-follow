@@ -11,9 +11,8 @@ to my previous "Circuit Cellar" article "Quadrotor Autonomous Flight with PX4 an
 (Circuit Cellar [number], [month] 2019)
 '''
 
-from yolov5 import test
-import cv2
-import torch
+from capture import get_capture
+from detection import detect
 
 import asyncio
 import cv2
@@ -42,7 +41,7 @@ async def run():
     by using Offboard control and position NED coordinates. """
     
     # Open the video camera
-    vid_cam = cv2.VideoCapture(0)
+    vid_cam = get_capture()
     print('vidcam')
 
     # Let the camera warm up
@@ -229,7 +228,7 @@ async def get_target_coordinates(vid_cam):
     # Resize the image frame for the detection process, if needed
    
     
-    centerxy= test.det(frame)
+    centerxy= detect(frame)
     if len(centerxy) > 0: #en az 1 nesne detect edildiğinde
         cX, cY = centerxy[0]
         #print("info")
